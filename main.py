@@ -16,7 +16,7 @@ class GetIP:
         response = requests.get(self.url_ip)
         self.ip = response.json()['ip']
         sleep(1)
-        bar.update(25)
+        bar.update(20)
         bar.set_postfix_str(f"Your IP was received successfully!")
 
     def get_ip(self):
@@ -34,28 +34,69 @@ class GetAddress:
         response = requests.get(self.url_address + self.ip_address + '/geo')
         self.city = response.json()['city']
         sleep(1)
-        bar.update(25)
+        bar.update(20)
         bar.set_postfix_str(f"Your City was detected successfully!")
 
     def get_city(self):
         return self.city
 
-def create_folder(bar):
-    sleep(1)
-    bar.update(25)
-    bar.set_postfix_str(f"Your Folder was created successfully!")
 
-def upload_json_yd(ip, city, bar):
-    info = dict()
-    info[ip] = city
-    info_json = json.dumps(info, ensure_ascii=False)
-    pbar.write(info_json)
-    sleep(1)
-    bar.update(25)
-    bar.set_postfix_str(f"Your File was uploaded successfully!")
-    sleep(1)
-    bar.set_postfix_str("Program closed!")
-    return info_json
+class YandexDisk:
+    urlYD = "https://cloud-api.yandex.net"
+
+    def __init__(self, your_token):
+        self.token = your_token
+        self.headers = {"Authorization": f"OAuth {self.token}"}
+
+    def create_folder(self, bar):
+        response = requests.put(self.urlYD + "/v1/disk/resources/" + f"?path=%2FYour IP city",
+                                headers=self.headers)
+        if response.status_code == 201:
+            sleep(1)
+            bar.update(20)
+            bar.set_postfix_str(f"Folder 'Your IP city' was created successfully!")
+        elif response.status_code == 409:
+            sleep(1)
+            bar.update(20)
+            bar.set_postfix_str(f"Folder 'Your IP city' already exists!")
+        else:
+            sleep(1)
+            bar.write(f"Folder 'Your IP city' was not created: {response.status_code}")
+            bar.write(response.json()["message"])
+            bar.close()
+            sys.exit(0)
+
+    def upload_file_to_folder(self, bar, ip, city):
+            response = requests.get(
+                self.urlYD + "/v1/disk/resources/upload" + f"?path=%2FYour IP city%2F{city}.json"
+                + "&overwrite=true", headers=self.headers)
+            if response.status_code == 200:
+                sleep(1)
+                bar.update(20)
+                bar.set_postfix_str(f"Link to upload file {city}.json received successfully!")
+            elif response.status_code == 409:
+                sleep(1)
+                bar.update(20)
+                bar.set_postfix_str(f"File {city}.json already exists!")
+            else:
+                bar.write(f"Error: {response.status_code}")
+                bar.write(response.json()["message"])
+                bar.close()
+                sys.exit(0)
+            path = response.json()["href"]
+            info = {ip: city}
+            info_json = json.dumps(info, ensure_ascii=False)
+            response2 = requests.put(path, info_json)
+            if response2.status_code == 201:
+                sleep(1)
+                bar.update(20)
+                bar.set_postfix_str(f"File {city}.json uploaded successfully!")
+            else:
+                bar.write(f"Loading error: {response2.status_code}")
+                bar.write(response2.json()["message"])
+                bar.close()
+                sys.exit(0)
+
 
 pbar = tqdm(total=100, desc=f"Program progress", file=sys.stdout)
 getip = GetIP()
@@ -64,6 +105,9 @@ address = GetAddress(getip.get_ip())
 address.set_city(pbar)
 load_dotenv()
 token = os.getenv("TOKEN")
-create_folder(pbar)
-upload_json_yd(getip.get_ip(), address.get_city(), pbar)
+YD = YandexDisk(token)
+YD.create_folder(pbar)
+YD.upload_file_to_folder(pbar, getip.get_ip(), address.get_city())
+sleep(1)
+pbar.set_postfix_str("Program closed!")
 pbar.close()
