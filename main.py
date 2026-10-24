@@ -31,7 +31,7 @@ class GetAddress:
         self.city = None
 
     def set_city(self, bar):
-        response = requests.get(self.url_address + self.ip_address + '/geo')
+        response = requests.get(f"{self.url_address}{self.ip_address}/geo")
         self.city = response.json()['city']
         sleep(1)
         bar.update(20)
@@ -49,8 +49,8 @@ class YandexDisk:
         self.headers = {"Authorization": f"OAuth {self.token}"}
 
     def create_folder(self, bar):
-        response = requests.put(self.urlYD + "/v1/disk/resources/" + f"?path=%2FYour IP city",
-                                headers=self.headers)
+        params = {"path": "/Your IP city"}
+        response = requests.put(f"{self.urlYD}/v1/disk/resources/", params=params, headers=self.headers)
         if response.status_code == 201:
             sleep(1)
             bar.update(20)
@@ -67,35 +67,38 @@ class YandexDisk:
             sys.exit(0)
 
     def upload_file_to_folder(self, bar, ip, city):
-            response = requests.get(
-                self.urlYD + "/v1/disk/resources/upload" + f"?path=%2FYour IP city%2F{city}.json"
-                + "&overwrite=true", headers=self.headers)
-            if response.status_code == 200:
-                sleep(1)
-                bar.update(20)
-                bar.set_postfix_str(f"Link to upload file {city}.json received successfully!")
-            elif response.status_code == 409:
-                sleep(1)
-                bar.update(20)
-                bar.set_postfix_str(f"File {city}.json already exists!")
-            else:
-                bar.write(f"Error: {response.status_code}")
-                bar.write(response.json()["message"])
-                bar.close()
-                sys.exit(0)
-            path = response.json()["href"]
-            info = {ip: city}
-            info_json = json.dumps(info, ensure_ascii=False)
-            response2 = requests.put(path, info_json)
-            if response2.status_code == 201:
-                sleep(1)
-                bar.update(20)
-                bar.set_postfix_str(f"File {city}.json uploaded successfully!")
-            else:
-                bar.write(f"Loading error: {response2.status_code}")
-                bar.write(response2.json()["message"])
-                bar.close()
-                sys.exit(0)
+        params = {
+            "path": f"/Your IP city/{city}.json",
+            "overwrite": "true"
+        }
+        response = requests.get(f"{self.urlYD}/v1/disk/resources/upload",
+                                params=params, headers=self.headers)
+        if response.status_code == 200:
+            sleep(1)
+            bar.update(20)
+            bar.set_postfix_str(f"Link to upload file {city}.json received successfully!")
+        elif response.status_code == 409:
+            sleep(1)
+            bar.update(20)
+            bar.set_postfix_str(f"File {city}.json already exists!")
+        else:
+            bar.write(f"Error: {response.status_code}")
+            bar.write(response.json()["message"])
+            bar.close()
+            sys.exit(0)
+        path = response.json()["href"]
+        info = {ip: city}
+        info_json = json.dumps(info, ensure_ascii=False)
+        response2 = requests.put(path, data=info_json.encode('utf-8'))
+        if response2.status_code == 201:
+            sleep(1)
+            bar.update(20)
+            bar.set_postfix_str(f"File {city}.json uploaded successfully!")
+        else:
+            bar.write(f"Loading error: {response2.status_code}")
+            bar.write(response2.json()["message"])
+            bar.close()
+            sys.exit(0)
 
 
 pbar = tqdm(total=100, desc=f"Program progress", file=sys.stdout)
